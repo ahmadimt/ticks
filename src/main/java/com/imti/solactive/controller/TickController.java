@@ -57,12 +57,14 @@ public class TickController {
 
   @GetMapping(value = "/statistics", produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
   public ResponseEntity<Response> getStatistics() {
+    log.info("Fetching overall statistics");
     return ResponseEntity.ok(tickService.getOverallStatistics());
   }
 
   @GetMapping(value = "/statistics/{instrument_identifier}", produces = MediaType.APPLICATION_JSON_UTF8_VALUE)
   public ResponseEntity<Response> getInstrumentStatistics(
       @PathVariable(value = "instrument_identifier") String instrumentIdentifier) {
+    log.info("Fetching statistics for the instrument with {}", instrumentIdentifier);
     return ResponseEntity.ok(tickService.getStatisticsByInstrument(instrumentIdentifier));
   }
 }

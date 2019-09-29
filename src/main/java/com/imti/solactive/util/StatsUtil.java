@@ -8,11 +8,13 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.LongAccumulator;
 import lombok.experimental.UtilityClass;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * created by imteyaza-1lm on 29/09/19
  **/
 @UtilityClass
+@Slf4j
 public class StatsUtil {
 
 
@@ -22,7 +24,7 @@ public class StatsUtil {
   }
 
   public static Stats updateOverallStats(Stats overallStats, Tick tick) {
-
+    log.info("Calculate and update overall statistics");
     double tickPrice = tick.getPrice();
     doUpdate(overallStats, tickPrice);
     return overallStats;
@@ -30,6 +32,7 @@ public class StatsUtil {
 
 
   public static Stats updateInstrumentsStats(Map<String, Stats> instrumentStats, Tick tick) {
+    log.info("Calculate and update Instrument Specific statistics for {}", tick.getInstrument());
     Stats stats = instrumentStats.get(tick.getInstrument());
     double tickPrice = tick.getPrice();
     BigDecimal bigDecimal = BigDecimal.valueOf(tickPrice).setScale(2, RoundingMode.HALF_UP);
