@@ -2,7 +2,7 @@
 
 ## Building the application
 
-1. Navigate to the root directory `solactive`.
+1. Navigate to the root directory `ticks`.
 2. On Linux or Mac, run `./mvnw clean install`. For windows `mvnw.cmd clean install`. This will build the application.
 3. Once the build is done, a uber jar named as `solactive-0.0.1-SNAPSHOT.jar` will be created in `target` folder.
 
