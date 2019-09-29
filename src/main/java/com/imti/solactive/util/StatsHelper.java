@@ -6,7 +6,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.atomic.LongAccumulator;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 
@@ -15,7 +16,7 @@ import lombok.extern.slf4j.Slf4j;
  **/
 @UtilityClass
 @Slf4j
-public class StatsUtil {
+public class StatsHelper {
 
 
   public static Stats fetchStatisticsByInstrument(Map<String, Stats> instrumentStats,
@@ -35,11 +36,12 @@ public class StatsUtil {
     log.info("Calculate and update Instrument Specific statistics for {}", tick.getInstrument());
     Stats stats = instrumentStats.get(tick.getInstrument());
     double tickPrice = tick.getPrice();
-    BigDecimal bigDecimal = BigDecimal.valueOf(tickPrice).setScale(2, RoundingMode.HALF_UP);
+    AtomicReference<BigDecimal> bigDecimal = new AtomicReference<>(
+        BigDecimal.valueOf(tickPrice).setScale(2, RoundingMode.HALF_UP));
     if (Objects.nonNull(stats)) {
       doUpdate(stats, tickPrice);
     } else {
-      stats = new Stats(bigDecimal, bigDecimal, bigDecimal, 1);
+      stats = new Stats(bigDecimal, bigDecimal, bigDecimal, new AtomicLong(1));
     }
     instrumentStats.put(tick.getInstrument(), stats);
     return stats;
@@ -47,20 +49,19 @@ public class StatsUtil {
 
   private static void doUpdate(Stats stats, double tickPrice) {
     BigDecimal price = BigDecimal.valueOf(tickPrice).setScale(2, RoundingMode.HALF_UP);
-    stats.setTotal(stats.getTotal().add(price));
-    if (stats.getMax().compareTo(BigDecimal.valueOf(tickPrice)) == -1) {
-      stats.setMax(price);
+    stats.getTotal().getAndSet(price.add(stats.getTotal().get()));
+
+    if (stats.getMax().get().compareTo(BigDecimal.valueOf(tickPrice)) == -1) {
+      stats.getMax().getAndSet(price);
     }
-    if (stats.getCount() == 0) {
-      stats.setMin(price);
+    if (stats.getCount().get() == 0) {
+      stats.getMin().getAndSet(price);
     } else {
-      if (stats.getMin().compareTo(BigDecimal.valueOf(tickPrice)) == 1) {
-        stats.setMin(price);
+      if (stats.getMin().get().compareTo(BigDecimal.valueOf(tickPrice)) == 1) {
+        stats.getMin().getAndSet(price);
       }
     }
-    LongAccumulator longAccumulator = new LongAccumulator(Long::sum, stats.getCount());
-    longAccumulator.accumulate(1);
-    stats.setCount(longAccumulator.get());
+    stats.getCount().getAndIncrement();
   }
 
 
