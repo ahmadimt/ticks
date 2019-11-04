@@ -3,11 +3,14 @@ package com.imti.solactive.util;
 import com.imti.solactive.model.Stats;
 import com.imti.solactive.model.Tick;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.OptionalDouble;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 
@@ -24,45 +27,43 @@ public class StatsHelper {
     return instrumentStats.get(instrument);
   }
 
-  public static Stats updateOverallStats(Stats overallStats, Tick tick) {
-    log.info("Calculate and update overall statistics");
-    double tickPrice = tick.getPrice();
-    doUpdate(overallStats, tickPrice);
-    return overallStats;
+  public static Stats updateOverallStats(final Map<Long, List<Tick>> ticks) {
+    log.info("Calculating and updating overall statistics");
+    List<Tick> collect = ticks.entrySet().stream().filter(
+        entry -> ChronoUnit.SECONDS
+            .between(Instant.ofEpochMilli(entry.getKey()), Instant.now())
+            <= 60)
+        .flatMap(entry -> entry.getValue().stream()).collect(Collectors.toList());
+    return getStats(collect);
   }
 
+  public static Stats updateTickStats(final Tick tick,
+      final Map<Long, List<Tick>> ticks) {
+    log.info("Calculating and updating overall statistics");
+    List<Tick> ticks1 = ticks.entrySet().stream().filter(
+        entry -> ChronoUnit.SECONDS
+            .between(Instant.ofEpochMilli(entry.getKey()), Instant.now())
+            <= 60)
+        .flatMap(entry -> entry.getValue().stream())
+        .filter(tick1 -> tick1.getInstrument().equalsIgnoreCase(tick.getInstrument()))
+        .collect(Collectors.toList());
+    return getStats(ticks1);
+  }
 
-  public static Stats updateInstrumentsStats(Map<String, Stats> instrumentStats, Tick tick) {
-    log.info("Calculate and update Instrument Specific statistics for {}", tick.getInstrument());
-    Stats stats = instrumentStats.get(tick.getInstrument());
-    double tickPrice = tick.getPrice();
-    AtomicReference<BigDecimal> bigDecimal = new AtomicReference<>(
-        BigDecimal.valueOf(tickPrice).setScale(2, RoundingMode.HALF_UP));
-    if (Objects.nonNull(stats)) {
-      doUpdate(stats, tickPrice);
-    } else {
-      stats = new Stats(bigDecimal, bigDecimal, bigDecimal, new AtomicLong(1));
-    }
-    instrumentStats.put(tick.getInstrument(), stats);
+  private static Stats getStats(List<Tick> ticks) {
+    OptionalDouble tempMax = ticks.stream().mapToDouble(Tick::getPrice).max();
+    OptionalDouble tempMin = ticks.stream().mapToDouble(Tick::getPrice).min();
+    double max = tempMax.orElse(0.00);
+    double min = tempMin.orElse(0.00);
+    BigDecimal total = ticks.stream().map(tick1 -> BigDecimal.valueOf(tick1.getPrice()))
+        .reduce(BigDecimal.ZERO, BigDecimal::add);
+    Stats stats = new Stats(new AtomicReference<>(BigDecimal.ZERO),
+        new AtomicReference<>(BigDecimal.ZERO), new AtomicReference<>(BigDecimal.ZERO),
+        new AtomicLong(0));
+    stats.getCount().getAndSet(ticks.size());
+    stats.getTotal().getAndSet(total);
+    stats.getMax().getAndSet(BigDecimal.valueOf(max));
+    stats.getMin().getAndSet(BigDecimal.valueOf(min));
     return stats;
   }
-
-  private static void doUpdate(Stats stats, double tickPrice) {
-    BigDecimal price = BigDecimal.valueOf(tickPrice).setScale(2, RoundingMode.HALF_UP);
-    stats.getTotal().getAndSet(price.add(stats.getTotal().get()));
-
-    if (stats.getMax().get().compareTo(BigDecimal.valueOf(tickPrice)) == -1) {
-      stats.getMax().getAndSet(price);
-    }
-    if (stats.getCount().get() == 0) {
-      stats.getMin().getAndSet(price);
-    } else {
-      if (stats.getMin().get().compareTo(BigDecimal.valueOf(tickPrice)) == 1) {
-        stats.getMin().getAndSet(price);
-      }
-    }
-    stats.getCount().getAndIncrement();
-  }
-
-
 }
